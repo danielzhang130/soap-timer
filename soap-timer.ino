@@ -51,6 +51,7 @@ void setup(void)
 
   accel.writeRegister(ADXL343_REG_ACT_INACT_CTL, 0x70);
   accel.writeRegister(ADXL343_REG_THRESH_ACT, 32);
+  accel.writeRegister(ADXL343_REG_BW_RATE, 0x0A | (1 << 4));
 
   for (byte i = 0; i < 7; ++i)
   {
@@ -58,6 +59,8 @@ void setup(void)
   }
   pinMode(12, OUTPUT);
   pinMode(13, OUTPUT);
+  pinMode(6, OUTPUT);
+  digitalWrite(6, 1);
 }
 
 void print7(byte c)
@@ -67,7 +70,8 @@ void print7(byte c)
   a = c / 10;
   b = c % 10;
 
-  if (a != 0) {
+  if (a != 0)
+  {
     for (byte i = 0; i < 7; ++i)
     {
       digitalWrite(segments[i], num[a][i]);
@@ -95,6 +99,25 @@ void clear(void)
   digitalWrite(13, 0);
 }
 
+void showVoltage(void)
+{
+  unsigned long time = millis();
+  
+  digitalWrite(6, 0);
+  byte v = analogRead(A7) / 10;
+  digitalWrite(6, 1);
+  
+  while (1)
+  {
+      print7(v);
+      if (millis() - time > 1000)
+      {
+        break;
+      }
+      delay(10);
+  }
+}
+
 void loop(void)
 {
   sensors_event_t event;
@@ -102,10 +125,13 @@ void loop(void)
 
   unsigned long time = millis();
   byte tmp = count;
-  while (tmp != 255) {
+  bool interrupt = tmp != 255;
+  while (tmp != 255)
+  {
     accel.checkInterrupts();
     print7(tmp);
-    if (millis() - time > 1000) {
+    if (millis() - time > 1000)
+    {
       count--;
       time = millis();
     }
@@ -113,6 +139,11 @@ void loop(void)
     tmp = count;
   }
 
+  if (interrupt)
+  {
+    showVoltage();
+  }
+  
   clear();
   LowPower.powerDown(SLEEP_500MS, ADC_OFF, BOD_OFF);
 }
