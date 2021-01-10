@@ -7,6 +7,10 @@ Adafruit_ADXL343 accel = Adafruit_ADXL343(12345);
 
 #define INPUT_PIN_INT   2
 
+// target 2mhz clock
+#define CLK_PRESCALE_FACTOR 4
+#define CLK_PRESCALE_HEX 0x02
+
 volatile byte count = 255;
 byte digits[] = {12, 13};
 byte segments[] = {11, 10, 5, 8, 3, 16, 15};
@@ -30,10 +34,13 @@ void int_isr(void)
 
 void setup(void)
 {
-  if (!accel.begin())
+  Serial.begin(9600);
+  while (!accel.begin())
   {
-    while (1);
+    Serial.println("Accel init failed.");
   }
+
+  Serial.println("Accel init complete.");
 
   accel.setRange(ADXL343_RANGE_16_G);
 
@@ -51,7 +58,9 @@ void setup(void)
 
   accel.writeRegister(ADXL343_REG_ACT_INACT_CTL, 0x70);
   accel.writeRegister(ADXL343_REG_THRESH_ACT, 32);
-  accel.writeRegister(ADXL343_REG_BW_RATE, 0x0A | (1 << 4));
+  accel.writeRegister(ADXL343_REG_BW_RATE, 0x07 | (1 << 4));
+
+  Serial.println("accel setup complete");
 
   for (byte i = 0; i < 7; ++i)
   {
@@ -60,7 +69,13 @@ void setup(void)
   pinMode(12, OUTPUT);
   pinMode(13, OUTPUT);
   pinMode(6, OUTPUT);
-  digitalWrite(6, 1);
+
+  // set ADC reference to 1.1v
+  analogReference(INTERNAL);
+
+  // slow down clock
+  CLKPR = 0x80;
+  CLKPR = CLK_PRESCALE_HEX;
 }
 
 void print7(byte c)
@@ -77,7 +92,7 @@ void print7(byte c)
       digitalWrite(segments[i], num[a][i]);
     }
     digitalWrite(digits[1], 0);
-    delay(5);
+    delay(5 / CLK_PRESCALE_FACTOR);
     digitalWrite(digits[1], 1);
   }
 
@@ -86,7 +101,7 @@ void print7(byte c)
     digitalWrite(segments[i], num[b][i]);
   }
   digitalWrite(digits[0], 0);
-  delay(5);
+  delay(5 / CLK_PRESCALE_FACTOR);
   digitalWrite(digits[0], 1);
 }
 
@@ -99,27 +114,25 @@ void clear(void)
   digitalWrite(13, 0);
 }
 
-void showVoltage(void)
+void showVoltage(byte v)
 {
   unsigned long time = millis();
   
-  digitalWrite(6, 0);
-  byte v = analogRead(A7) / 10;
-  digitalWrite(6, 1);
-  
+  Serial.println(v);
   while (1)
   {
       print7(v);
-      if (millis() - time > 1000)
+      if (millis() - time > 1000 / CLK_PRESCALE_FACTOR)
       {
         break;
       }
-      delay(10);
+      delay(10 / CLK_PRESCALE_FACTOR);
   }
 }
-
+byte v;
 void loop(void)
 {
+  v = analogRead(A7) / 31.03;
   sensors_event_t event;
   accel.getEvent(&event);
 
@@ -130,20 +143,20 @@ void loop(void)
   {
     accel.checkInterrupts();
     print7(tmp);
-    if (millis() - time > 1000)
+    if (millis() - time > 1000 / CLK_PRESCALE_FACTOR)
     {
       count--;
       time = millis();
     }
-    delay(10);
+    delay(10 / CLK_PRESCALE_FACTOR);
     tmp = count;
   }
 
   if (interrupt)
   {
-    showVoltage();
+    showVoltage(v);
   }
   
   clear();
-  LowPower.powerDown(SLEEP_500MS, ADC_OFF, BOD_OFF);
+  LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
 }
