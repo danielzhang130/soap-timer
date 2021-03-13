@@ -57,7 +57,7 @@ void setup(void)
   accel.mapInterrupts(g_int_config_map);
 
   accel.writeRegister(ADXL343_REG_ACT_INACT_CTL, 0x70);
-  accel.writeRegister(ADXL343_REG_THRESH_ACT, 32);
+  accel.writeRegister(ADXL343_REG_THRESH_ACT, 20);
   accel.writeRegister(ADXL343_REG_BW_RATE, 0x07 | (1 << 4));
 
   Serial.println("accel setup complete");
